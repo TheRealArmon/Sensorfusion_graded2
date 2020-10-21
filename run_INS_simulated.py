@@ -178,8 +178,8 @@ x_pred[0, VEL_IDX] = np.array([20, 0, 0])  # starting at 20 m/s due north
 x_pred[0, 6] = 1  # no initial rotation: nose to North, right to East, and belly down
 
 # These have to be set reasonably to get good results
-P_pred[0][POS_IDX ** 2] = np.eye(3)# TODO
-P_pred[0][VEL_IDX ** 2] = np.eye(3)# TODO
+P_pred[0][POS_IDX ** 2] = 10 * np.eye(3)# TODO
+P_pred[0][VEL_IDX ** 2] = 5 * np.eye(3)# TODO
 P_pred[0][ERR_ATT_IDX ** 2] = np.eye(3)# TODO # error rotation vector (not quat)
 P_pred[0][ERR_ACC_BIAS_IDX ** 2] = np.eye(3)# TODO
 P_pred[0][ERR_GYRO_BIAS_IDX ** 2] = np.eye(3)# TODO
@@ -190,12 +190,12 @@ dummy = eskf.update_GNSS_position(x_pred[0], P_pred[0], z_GNSS[0], R_GNSS, lever
 # %% Run estimation
 # run this file with 'python -O run_INS_simulated.py' to turn of assertions and get about 8/5 speed increase for longer runs
 
-N: int = 500 # TODO: choose a small value to begin with (500?), and gradually increase as you OK results
+N: int = 1000 # TODO: choose a small value to begin with (500?), and gradually increase as you OK results
 doGNSS: bool = True  # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
-#for k in tqdm.trange(N):
-for k in range(N):
+
+for k in tqdm(range(N)):
     if doGNSS and timeIMU[k] >= timeGNSS[GNSSk]:
         NIS[GNSSk] = eskf.NIS_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
 
