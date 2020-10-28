@@ -114,12 +114,13 @@ class ESKF:
 
         # Hva må denne brukes til? Final state i NED? Rotere acc og omega?
         R = quaternion_to_rotation_matrix(quaternion, debug=self.debug)
-        a_NED = R@acceleration
+        g = np.array([0, 0, 9.81])
+        a_NED = R@acceleration + g
 
 
         position_prediction = position + Ts*velocity + 1/2 * Ts**2  * a_NED # Må bruke a_NED
         velocity_prediction = velocity + Ts * a_NED # Må bruke a_NED
-        Kappa = Ts*R@omega # Må gange med R
+        Kappa = Ts*omega # Må gange med R?
 
         # Might need to reshape
         arr1 = np.array([np.cos(np.linalg.norm(Kappa)/2)])
@@ -180,12 +181,12 @@ class ESKF:
 
         # Set submatrices
         A[POS_IDX * VEL_IDX] = np.eye(3)
-        A[VEL_IDX * ERR_ATT_IDX] = -R*cross_product_matrix(acceleration) # Riktig?
+        A[VEL_IDX * ERR_ATT_IDX] = -R @ cross_product_matrix(acceleration) # Riktig?
         A[VEL_IDX * ERR_ACC_BIAS_IDX] = -R
         A[ERR_ATT_IDX * ERR_ATT_IDX] = -cross_product_matrix(omega) # Riktig?
         A[ERR_ATT_IDX * ERR_GYRO_BIAS_IDX] = -np.eye(3)
-        A[ERR_ACC_BIAS_IDX * ERR_ACC_BIAS_IDX] = self.p_acc * np.eye(3)
-        A[ERR_GYRO_BIAS_IDX * ERR_GYRO_BIAS_IDX] = self.p_gyro * np.eye(3)
+        A[ERR_ACC_BIAS_IDX * ERR_ACC_BIAS_IDX] = -self.p_acc * np.eye(3)
+        A[ERR_GYRO_BIAS_IDX * ERR_GYRO_BIAS_IDX] = -self.p_gyro * np.eye(3)
 
         # Bias correction
         A[VEL_IDX * ERR_ACC_BIAS_IDX] = A[VEL_IDX * ERR_ACC_BIAS_IDX] @ self.S_a
@@ -700,12 +701,12 @@ class ESKF:
 
         d_x = cls.delta_x(x_nominal, x_true)
 
-        NEES_all = d_x.T @ la.inv(P) @ d_x  # TODO: NEES all
-        NEES_pos = d_x[POS_IDX].T @ la.inv(P[POS_IDX**2]) @ d_x[POS_IDX]  # TODO: NEES position
-        NEES_vel = d_x[VEL_IDX].T @ la.inv(P[VEL_IDX**2]) @ d_x[VEL_IDX]  # TODO: NEES velocity
-        NEES_att = d_x[ATT_IDX].T @ la.inv(P[ATT_IDX**2]) @ d_x[ATT_IDX]  # TODO: NEES attitude
-        NEES_accbias = d_x[ACC_BIAS_IDX].T @ la.inv(P[ACC_BIAS_IDX**2]) @ d_x[ACC_BIAS_IDX]  # TODO: NEES accelerometer bias
-        NEES_gyrobias = d_x[ERR_GYRO_BIAS_IDX].T @ la.inv(P[ERR_GYRO_BIAS_IDX**2]) @ d_x[ERR_GYRO_BIAS_IDX]  # TODO: NEES gyroscope bias
+        NEES_all = d_x.T @ la.solve(P, d_x)  # TODO: NEES all
+        NEES_pos = d_x[POS_IDX].T @ la.solve(P[POS_IDX**2], d_x[POS_IDX])  # TODO: NEES position
+        NEES_vel = d_x[VEL_IDX].T @ la.solve(P[VEL_IDX**2], d_x[VEL_IDX])  # TODO: NEES velocity
+        NEES_att = d_x[ATT_IDX].T @ la.solve(P[ATT_IDX**2], d_x[ATT_IDX])  # TODO: NEES attitude
+        NEES_accbias = d_x[ACC_BIAS_IDX].T @ la.solve(P[ACC_BIAS_IDX**2], d_x[ACC_BIAS_IDX])  # TODO: NEES accelerometer bias
+        NEES_gyrobias = d_x[ERR_GYRO_BIAS_IDX].T @ la.solve(P[ERR_GYRO_BIAS_IDX**2], d_x[ERR_GYRO_BIAS_IDX])  # TODO: NEES gyroscope bias
 
         NEESes = np.array(
             [NEES_all, NEES_pos, NEES_vel, NEES_att, NEES_accbias, NEES_gyrobias]
