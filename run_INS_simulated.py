@@ -95,8 +95,8 @@ loaded_data = scipy.io.loadmat(filename_to_load)
 
 S_a = loaded_data["S_a"]
 S_g = loaded_data["S_g"]
-S_a = np.eye(3)
-S_g = np.eye(3)
+# S_a = np.eye(3) # For task 3c
+# S_g = np.eye(3) # For task 3c
 lever_arm = loaded_data["leverarm"].ravel()
 timeGNSS = loaded_data["timeGNSS"].ravel()
 timeIMU = loaded_data["timeIMU"].ravel()
@@ -114,7 +114,7 @@ gnss_steps = len(z_GNSS)
 # %% Measurement noise
 # IMU noise values for STIM300, based on datasheet and simulation sample rate
 # Continous noise
-# TODO: What to remove here?
+
 cont_gyro_noise_std = 4.36e-5  # (rad/s)/sqrt(Hz)
 cont_acc_noise_std = 1.167e-3  # (m/s**2)/sqrt(Hz)
 
@@ -123,12 +123,12 @@ rate_std = cont_gyro_noise_std * np.sqrt(1 / dt)
 acc_std = cont_acc_noise_std * np.sqrt(1 / dt)
 
 # Bias values
-rate_bias_driving_noise_std = 5e-5
+rate_bias_driving_noise_std = 5e-12
 cont_rate_bias_driving_noise_std = (
     rate_bias_driving_noise_std / np.sqrt(1 / dt)
 )
 
-acc_bias_driving_noise_std = 1e-2 #4e-3 original
+acc_bias_driving_noise_std = 1e-2
 cont_acc_bias_driving_noise_std = acc_bias_driving_noise_std / np.sqrt(1 / dt)
 
 # Position and velocity measurement
@@ -188,7 +188,7 @@ dummy = eskf.update_GNSS_position(x_pred[0], P_pred[0], z_GNSS[0], R_GNSS, lever
 # %% Run estimation
 # run this file with 'python -O run_INS_simulated.py' to turn of assertions and get about 8/5 speed increase for longer runs
 
-N: int = steps # TODO: choose a small value to begin with (500?), and gradually increase as you OK results
+N: int = 10000 # TODO: choose a small value to begin with (500?), and gradually increase as you OK results
 doGNSS: bool = True  # TODO: Set this to False if you want to check that the predictions make sense over reasonable time lenghts
 
 GNSSk: int = 0  # keep track of current step in GNSS measurements
@@ -220,6 +220,7 @@ for k in tqdm(range(N)):
 
     if eskf.debug:
         assert np.all(np.isfinite(P_pred[k])), f"Not finite P_pred at index {k + 1}"
+
 
 
 # %% Plots
@@ -353,6 +354,7 @@ CI15 = np.array(scipy.stats.chi2.interval(confprob, 15)).reshape((2, 1))
 CI3 = np.array(scipy.stats.chi2.interval(confprob, 3)).reshape((2, 1))
 CI3N = np.array(scipy.stats.chi2.interval(confprob, 3 * N)) / N
 CI15N = np.array(scipy.stats.chi2.interval(confprob, 15 * N)) / N
+CI3ANIS = np.array(scipy.stats.chi2.interval(confprob, 3 * GNSSk)) / GNSSk
 
 fig5, axs5 = plt.subplots(4, 1, num=5, clear=True)
 fig7, axs7 = plt.subplots(3, 1, num=7, clear=True)
@@ -439,20 +441,18 @@ ANEES_att = NEES_att[:N].mean()
 ANEES_accbias = NEES_accbias[:N].mean()
 ANEES_gyrobias = NEES_gyrobias[:N].mean()
 
-    
 
-print(rf'{"ANEES:":<20} {ANEES:^25} {CI15N}')
-print(rf'{"ANEESS_pos:":<20} {ANEES_pos:^25} {CI3N}')
-print(rf'{"ANEES_vel:":<20} {ANEES_vel:^25} {CI3N}')
-print(rf'{"ANEES_att:":<20} {ANEES_att:^25} {CI3N}')
-print(rf'{"ANEES_accbias:":<20} {ANEES_accbias:^25} {CI3N}')
-print(rf'{"ANEES_gyrobias:":<20} {ANEES_gyrobias:^25} {CI3N}')
+print(f'ANEES: {ANEES:.2f} with CI: [{CI15N[0]:.2f}, {CI15N[1]:.2f}]')
+print(f'ANEES_pos: {ANEES_pos:.2f} with CI: [{CI3N[0]:.2f}, {CI3N[1]:.2f}]')
+print(f'ANEES_vel: {ANEES_vel:.2f} with CI: [{CI3N[0]:.2f}, {CI3N[1]:.2f}]')
+print(f'ANEES_att: {ANEES_att:.2f} with CI: [{CI3N[0]:.2f}, {CI3N[1]:.2f}]')
+print(f'ANEES_accbias: {ANEES_accbias:.2f} with CI: [{CI3N[0]:.2f}, {CI3N[1]:.2f}]')
+print(f'ANEES_gyrobias: {ANEES_gyrobias:.2f} with CI: [{CI3N[0]:.2f}, {CI3N[1]:.2f}]')
+print(f'ANIS: {ANIS:.2f} with CI: [{CI3ANIS[0]:.2f}, {CI3ANIS[1]:.2f}]')
 
-print(rf'{"ANIS:":<20} {ANIS:^25} {CI3N}')
-
-# #plt.close(fig1)
+# plt.close(fig1)
 # plt.close(fig2)
-# plt.close(fig3)
+# #plt.close(fig3)
 # plt.close(fig4)
 # #plt.close(fig5)
 # plt.close(fig6)

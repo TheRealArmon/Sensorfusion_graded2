@@ -8,6 +8,10 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
+#from numba import jit
+
+
+
 try: # see if tqdm is available, otherwise define it as a dummy
     try: # Ipython seem to require different tqdm.. try..except seem to be the easiest way to check
         __IPYTHON__
@@ -120,14 +124,14 @@ cont_gyro_noise_std = 4.36e-6 # TODO
 cont_acc_noise_std = 1.167e-4 # TODO
 
 # Discrete sample noise at simulation rate used
-rate_std = cont_gyro_noise_std*np.sqrt(1/dt)
-acc_std  = cont_acc_noise_std*np.sqrt(1/dt)
+rate_std = 0.5*cont_gyro_noise_std*np.sqrt(1/dt)
+acc_std  = 0.5*cont_acc_noise_std*np.sqrt(1/dt)
 
 # Bias values
-rate_bias_driving_noise_std = 5e-5# TODO
+rate_bias_driving_noise_std = 9e-5# TODO
 cont_rate_bias_driving_noise_std = rate_bias_driving_noise_std/np.sqrt(1/dt)
 
-acc_bias_driving_noise_std = 4e-3# TODO
+acc_bias_driving_noise_std = 8e-3# TODO
 cont_acc_bias_driving_noise_std = acc_bias_driving_noise_std/np.sqrt(1/dt)
 
 # Position and velocity measurement
@@ -167,20 +171,19 @@ x_pred[0, ATT_IDX] = np.array([
     np.sin(45 * np.pi / 180)
 ])  # nose to east, right to south and belly down.
 
-P_pred[0][POS_IDX**2] = 10**2 * np.eye(3)
-P_pred[0][VEL_IDX**2] = 3**2 * np.eye(3)
-P_pred[0][ERR_ATT_IDX**2] = (np.pi/30)**2 * np.eye(3) # error rotation vector (not quat)
-P_pred[0][ERR_ACC_BIAS_IDX**2] = 0.05**2 * np.eye(3)
-P_pred[0][ERR_GYRO_BIAS_IDX**2] = (1e-3)**2 * np.eye(3)
-
+P_pred[0][POS_IDX ** 2] = 10 * np.eye(3)
+P_pred[0][VEL_IDX ** 2] = 2 * np.eye(3)
+P_pred[0][ERR_ATT_IDX ** 2] = 0.0001 * np.eye(3)
+P_pred[0][ERR_ACC_BIAS_IDX ** 2] = 0.00001 * np.eye(3)
+P_pred[0][ERR_GYRO_BIAS_IDX ** 2] = 0.0000004 * np.eye(3)
 # %% Run estimation
 
-N = steps//10
+N = steps
 GNSSk = 0
 
 for k in tqdm(range(N)):
     if timeIMU[k] >= timeGNSS[GNSSk]:
-        R_GNSS = accuracy_GNSS[GNSSk]**2 * np.diag([1,1,1]) # Current GNSS covariance
+        R_GNSS = 0.5 * accuracy_GNSS[GNSSk]**2 * np.diag([0.3,0.3,0.5]) # Current GNSS covariance
         NIS[GNSSk] = eskf.NIS_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], R_GNSS, lever_arm)# TODO
 
         x_est[k], P_est[k] = eskf.update_GNSS_position(x_pred[k], P_pred[k], z_GNSS[GNSSk], R_GNSS, lever_arm)
@@ -252,10 +255,14 @@ CI3 = np.array(scipy.stats.chi2.interval(confprob, 3)).reshape((2, 1))
 
 fig3 = plt.figure()
 
+CI3ANIS = np.array(scipy.stats.chi2.interval(confprob, 3 * GNSSk)) / GNSSk
+ANIS = NIS[:GNSSk].mean()
+print(f'ANIS: {ANIS:.2f} with CI: [{CI3ANIS[0]:.2f}, {CI3ANIS[1]:.2f}]')
+
 plt.plot(NIS[:GNSSk])
 plt.plot(np.array([0, N-1]) * dt, (CI3@np.ones((1, 2))).T)
 insideCI = np.mean((CI3[0] <= NIS[:GNSSk]) * (NIS[:GNSSk] <= CI3[1]))
-plt.title(f'NIS ({100 *  insideCI:.1f} inside {100 * confprob} confidence interval)')
+plt.title(f'NIS ({100 *  insideCI:.1f} inside {100 * confprob} confidence interval). ANIS: {ANIS:.2f} with CI: [{CI3ANIS[0]:.2f}, {CI3ANIS[1]:.2f}]')
 plt.grid()
 
 # %% box plots
@@ -266,8 +273,12 @@ plt.boxplot([NIS[0:GNSSk], gauss_compare], notch=True)
 plt.legend('NIS', 'gauss')
 plt.grid()
 
+
+
 # %%
-# plt.close(fig2)
+#plt.close(fig1)
 # plt.close(fig3)
-# plt.close(fig4)
+plt.close(fig4)
 plt.show()
+ANIS_slice = NIS[GNSSk//6:5*GNSSk//6].mean()
+print(ANIS_slice)

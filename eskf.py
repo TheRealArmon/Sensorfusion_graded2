@@ -267,8 +267,8 @@ class ESKF:
             30,
         ), f"ESKF.discrete_error_matrices: Van Loan matrix shape incorrect {omega.shape}"
 
-
-        VanLoanMatrix = la.expm(V)
+        VanLoanMatrix =  np.eye(30) + V + V@V/2 #la.expm(V)
+        #VanLoanMatrix = la.expm(V)
         Ad = VanLoanMatrix[15:,15:].T # CatSlice
         GQGd = Ad @ VanLoanMatrix[0:15,15:]
 
@@ -654,18 +654,19 @@ class ESKF:
             16,
         ), f"ESKF.delta_x: x_true shape incorrect {x_true.shape}"
 
-        delta_position = x_true[POS_IDX] - x_nominal[POS_IDX]  # TODO: Delta position
-        delta_velocity = x_true[VEL_IDX] - x_nominal[VEL_IDX]  # TODO: Delta velocity
+        delta_position = x_true[POS_IDX] - x_nominal[POS_IDX]
+        delta_velocity = x_true[VEL_IDX] - x_nominal[VEL_IDX]
 
-        #q_nom = x_nominal[ATT_IDX]
-        quaternion_conj = np.diag([1,-1,-1,-1]) @ x_nominal[ATT_IDX]  # TODO: Conjugate of quaternion
+        quaternion_conj = np.diag([1,-1,-1,-1]) @ x_nominal[ATT_IDX]
 
-        delta_quaternion = quaternion_product(quaternion_conj, x_true[ATT_IDX])  # TODO: Error quaternion
+        delta_quaternion = quaternion_product(quaternion_conj, x_true[ATT_IDX])
+        if delta_quaternion[0] < 0:
+            delta_quaternion = -delta_quaternion
         delta_theta = 2*delta_quaternion[1:]
 
         # Concatenation of bias indices
         BIAS_IDX = ACC_BIAS_IDX + GYRO_BIAS_IDX
-        delta_bias = x_true[BIAS_IDX] - x_nominal[BIAS_IDX]  # TODO: Error biases
+        delta_bias = x_true[BIAS_IDX] - x_nominal[BIAS_IDX]
 
         d_x = np.concatenate((delta_position, delta_velocity, delta_theta, delta_bias))
 
